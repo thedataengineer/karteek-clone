@@ -105,6 +105,16 @@ class ApplyTests(unittest.TestCase):
         self.assertIn('nodes', entry['changeset'])
         self.assertEqual(entry['changeset']['nodes'][0]['id'], 'claim:c')
 
+    def test_unlink_replaces_outgoing_edges(self):
+        self.g.apply(statement_and_claim(), 'indexer')
+        other = Changeset(
+            [Node('Source', 'source:t', {'label': 'T', 'kind': 'statement'}),
+             Node('Claim', 'claim:c', {'label': 'C', 'status': 'confirmed', 'defined_in': 'identity/profile.md'})],
+            [Edge('SUPPORTED_BY', 'claim:c', 'source:t', 'L9')], unlink=['claim:c'])
+        self.g.apply(other, 'indexer')
+        self.assertEqual(self.g.neighbors('claim:c', 'SUPPORTED_BY', 'out'), [('SUPPORTED_BY', 'Source', 'source:t', 'L9')])
+        self.assertEqual(self.g.neighbors('source:s'), [])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -97,6 +97,17 @@ class GateTests(unittest.TestCase):
         cs = Changeset([private_doc, tracked_doc], [Edge('LINKS_TO', 'doc:private/accounts/acme/context.md', 'doc:identity/profile.md')])
         run_gates(cs, self.g, 'indexer')
 
+    def test_unlink_must_restate_node_and_drops_stored_evidence(self):
+        self.g.execute("CREATE (:Source {id:'source:s', label:'S', kind:'statement', scope:'tracked', history:[]})")
+        self.g.execute("CREATE (:Claim {id:'claim:c', label:'C', status:'confirmed', scope:'tracked', history:[]})")
+        self.g.execute("MATCH (c:Claim {id:'claim:c'}),(s:Source {id:'source:s'}) CREATE (c)-[:SUPPORTED_BY {locator:'L1'}]->(s)")
+        self.assertEqual(self.gate(Changeset(unlink=['claim:c'])), 'integrity')
+        self.assertEqual(self.gate(Changeset([claim()], unlink=['claim:c'])), 'evidence')
+        run_gates(Changeset([claim()], [Edge('SUPPORTED_BY', 'claim:c', 'source:s')], unlink=['claim:c']), self.g, 'indexer')
+        cs = Changeset([claim()], [Edge('SUPPORTED_BY', 'claim:c', 'source:s')], unlink=['claim:c'])
+        self.assertEqual(Changeset.from_json(cs.to_json()), cs)
+        self.assertEqual(cs.summary()['unlink'], 1)
+
 
 if __name__ == '__main__':
     unittest.main()

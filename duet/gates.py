@@ -36,6 +36,15 @@ def run_gates(cs, graph, actor):
         if (a, b) not in REL_TABLES.get(e.rel, []):
             raise GateError('integrity', f'{e.rel} does not connect {a} to {b}')
 
+    unlinked = set(cs.unlink)
+    for node_id in cs.unlink:
+        if node_id not in in_cs:
+            raise GateError('integrity', f'unlink {node_id}: a node may only be unlinked in a changeset that restates it')
+
+    def stored_out(node_id, rel):
+        """Outgoing edges already in the graph; none survive for a node being unlinked."""
+        return [] if node_id in unlinked else [t[2] for t in graph.neighbors(node_id, rel, 'out')]
+
     supported = defaultdict(list)
     corrected = set()
     committed = set()
@@ -49,7 +58,7 @@ def run_gates(cs, graph, actor):
 
     for n in cs.nodes:
         if n.table in EVIDENCE_TABLES:
-            sources = supported.get(n.id) or [t[2] for t in graph.neighbors(n.id, 'SUPPORTED_BY', 'out')]
+            sources = supported.get(n.id) or stored_out(n.id, 'SUPPORTED_BY')
             if not sources:
                 raise GateError('evidence', f'{n.id} has no SUPPORTED_BY source')
             if n.table == 'Claim':
@@ -65,7 +74,7 @@ def run_gates(cs, graph, actor):
             owner_known = n.props.get('owner_known')
             if not isinstance(owner_known, bool):
                 raise GateError('commitment', f'{n.id}: owner_known must be true or false')
-            has_owner = n.id in committed or bool(graph.neighbors(n.id, 'COMMITTED_BY', 'out'))
+            has_owner = n.id in committed or bool(stored_out(n.id, 'COMMITTED_BY'))
             if owner_known != has_owner:
                 raise GateError('commitment', f'{n.id}: owner_known={owner_known} but COMMITTED_BY present={has_owner}')
 

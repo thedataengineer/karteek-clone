@@ -4,9 +4,11 @@ import json
 import sys
 
 from duet.config import paths
+from duet.ecl import index as run_index
+from duet.graph import Graph
 
 
-def cmd_status(p):
+def cmd_status(p, args):
     print(f'vault: {p.vault}')
     print(f'db: {"present" if p.db.exists() else "absent"} ({p.db})')
     if p.index_report.exists():
@@ -18,15 +20,28 @@ def cmd_status(p):
     return 0
 
 
-COMMANDS = {'status': cmd_status}
+def cmd_index(p, force=False):
+    with Graph.open(p) as graph:
+        graph.ensure_schema()
+        report = run_index(p.vault, graph, force=force)
+    print(f'parsed={len(report["parsed"])} unchanged={len(report["unchanged"])} rejected={len(report["rejected"])} '
+          f'skipped={len(report["skipped"])} retired={len(report["retired"])}')
+    for item in report['rejected']:
+        print(f'  rejected {item["path"]}: {item["message"]}')
+    return 1 if report['rejected'] else 0
+
+
+COMMANDS = {'status': cmd_status, 'index': lambda p, args: cmd_index(p, args.force)}
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog='duet', description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('status', help='Show vault, database and last index run.')
+    idx = sub.add_parser('index', help='Index changed vault pages into the graph.')
+    idx.add_argument('--force', action='store_true', help='Re-index every page regardless of hash.')
     args = parser.parse_args(argv)
-    return COMMANDS[args.command](paths())
+    return COMMANDS[args.command](paths(), args)
 
 
 if __name__ == '__main__':

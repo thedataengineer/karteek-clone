@@ -101,6 +101,8 @@ class Graph:
                 self.execute('MATCH (n {id: $id}) DETACH DELETE n', {'id': node_id})
             for node in changeset.nodes:
                 self._upsert_node(node, when)
+            for node_id in changeset.unlink:
+                self.execute('MATCH (n {id: $id})-[r]->() DELETE r', {'id': node_id})
             for edge in changeset.edges:
                 src_table = tables.get(edge.src) or self.node(edge.src)[0]
                 dst_table = tables.get(edge.dst) or self.node(edge.dst)[0]
