@@ -4,13 +4,13 @@
     {
       "id": 0,
       "subject": "Task 0: Package scaffold, config, and CLI skeleton",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** An installable duet package whose config module locates the vault and derives all paths, with `python -m duet status` working and the existing eleven tests still green.\n\n**Files:**\n- Create: pyproject.toml\n- Create: duet/__init__.py\n- Create: duet/config.py\n- Create: duet/__main__.py\n- Modify: scripts/config.py (shim)\n- Create: tests/fixtures/vault/AGENTS.md\n- Create: tests/test_config.py\n- Modify: .gitignore\n\n**Acceptance Criteria:**\n- [ ] pip install -e . succeeds; import duet, ladybug, mcp works\n- [ ] paths(vault=X) resolves db, journal, index_state, index_report, lock, views under X/private/\n- [ ] vault_path() exits with the .env.example hint when unset\n- [ ] python -m duet status prints vault and db: absent\n- [ ] All tests pass (11 old + 4 new)\n\n**Verify:** `.venv/bin/python -m unittest discover -s tests -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"pyproject.toml\", \"duet/__init__.py\", \"duet/config.py\", \"duet/__main__.py\", \"scripts/config.py\", \"tests/test_config.py\"], \"verifyCommand\": \".venv/bin/python -m unittest discover -s tests -v\", \"acceptanceCriteria\": [\"pip install -e . succeeds; import duet, ladybug, mcp works\", \"paths(vault=X) resolves db, journal, index_state, index_report, lock, views under X/private/\", \"vault_path() exits with the .env.example hint when unset\", \"python -m duet status prints vault and db: absent\", \"All tests pass (11 old + 4 new)\"]}\n```"
     },
     {
       "id": 1,
       "subject": "Task 1: Schema and graph store",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** Graph.open creates or opens the LadybugDB file under private/graph/, creates every table idempotently, holds a file lock while writable, and offers execute, rows, node, neighbors, tables, counts.\n\n**Files:**\n- Create: duet/schema.py\n- Create: duet/graph.py\n- Test: tests/test_graph.py\n\n**Acceptance Criteria:**\n- [ ] tables() contains 12 node and 14 relation tables after ensure_schema, idempotent\n- [ ] node() returns (table, props) without _ID/_LABEL; None when missing\n- [ ] neighbors(id, rel, direction) returns (rel, table, other_id, locator) tuples\n- [ ] second writer raises RuntimeError; read_only=True opens without lock\n- [ ] counts() covers every node table\n\n**Verify:** `.venv/bin/python -m unittest tests.test_graph -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/schema.py\", \"duet/graph.py\", \"tests/test_graph.py\"], \"verifyCommand\": \".venv/bin/python -m unittest tests.test_graph -v\", \"acceptanceCriteria\": [\"tables() contains 12 node and 14 relation tables after ensure_schema, idempotent\", \"node() returns (table, props) without _ID/_LABEL; None when missing\", \"neighbors(id, rel, direction) returns (rel, table, other_id, locator) tuples\", \"second writer raises RuntimeError; read_only=True opens without lock\", \"counts() covers every node table\"]}\n```",
       "blockedBy": [
         0
@@ -82,5 +82,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-11-09T08:04:12+00:00"
+  "lastUpdated": "2026-11-09T22:56:16+00:00"
 }
