@@ -6,6 +6,7 @@ import sys
 from duet.config import paths
 from duet.ecl import index as run_index
 from duet.graph import Graph
+from duet.project import project as run_project
 
 
 def cmd_status(p, args):
@@ -24,6 +25,7 @@ def cmd_index(p, force=False):
     with Graph.open(p) as graph:
         graph.ensure_schema()
         report = run_index(p.vault, graph, force=force)
+        run_project(graph, p)  # views are always fresh after an index
     print(f'parsed={len(report["parsed"])} unchanged={len(report["unchanged"])} rejected={len(report["rejected"])} '
           f'skipped={len(report["skipped"])} retired={len(report["retired"])}')
     for item in report['rejected']:
@@ -31,7 +33,14 @@ def cmd_index(p, force=False):
     return 1 if report['rejected'] else 0
 
 
-COMMANDS = {'status': cmd_status, 'index': lambda p, args: cmd_index(p, args.force)}
+def cmd_project(p, args):
+    with Graph.open(p, read_only=True) as graph:
+        names = run_project(graph, p)
+    print('views: ' + ', '.join(names))
+    return 0
+
+
+COMMANDS = {'status': cmd_status, 'index': lambda p, args: cmd_index(p, args.force), 'project': cmd_project}
 
 
 def main(argv=None):
@@ -40,6 +49,7 @@ def main(argv=None):
     sub.add_parser('status', help='Show vault, database and last index run.')
     idx = sub.add_parser('index', help='Index changed vault pages into the graph.')
     idx.add_argument('--force', action='store_true', help='Re-index every page regardless of hash.')
+    sub.add_parser('project', help='Render Markdown views under private/views/.')
     args = parser.parse_args(argv)
     return COMMANDS[args.command](paths(), args)
 
