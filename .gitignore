@@ -1,0 +1,8 @@
+.DS_Store
+.obsidian/workspace*.json
+.env
+.env.*
+!.env.example
+private/
+__pycache__/
+.claude/settings.local.json

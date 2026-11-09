@@ -1,0 +1,86 @@
+{
+  "planPath": "docs/superpowers/plans/2026-11-08-duet-phase-1.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 0: Package scaffold, config, and CLI skeleton",
+      "status": "pending",
+      "description": "**Goal:** An installable duet package whose config module locates the vault and derives all paths, with `python -m duet status` working and the existing eleven tests still green.\n\n**Files:**\n- Create: pyproject.toml\n- Create: duet/__init__.py\n- Create: duet/config.py\n- Create: duet/__main__.py\n- Modify: scripts/config.py (shim)\n- Create: tests/fixtures/vault/AGENTS.md\n- Create: tests/test_config.py\n- Modify: .gitignore\n\n**Acceptance Criteria:**\n- [ ] pip install -e . succeeds; import duet, ladybug, mcp works\n- [ ] paths(vault=X) resolves db, journal, index_state, index_report, lock, views under X/private/\n- [ ] vault_path() exits with the .env.example hint when unset\n- [ ] python -m duet status prints vault and db: absent\n- [ ] All tests pass (11 old + 4 new)\n\n**Verify:** `.venv/bin/python -m unittest discover -s tests -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"pyproject.toml\", \"duet/__init__.py\", \"duet/config.py\", \"duet/__main__.py\", \"scripts/config.py\", \"tests/test_config.py\"], \"verifyCommand\": \".venv/bin/python -m unittest discover -s tests -v\", \"acceptanceCriteria\": [\"pip install -e . succeeds; import duet, ladybug, mcp works\", \"paths(vault=X) resolves db, journal, index_state, index_report, lock, views under X/private/\", \"vault_path() exits with the .env.example hint when unset\", \"python -m duet status prints vault and db: absent\", \"All tests pass (11 old + 4 new)\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 1: Schema and graph store",
+      "status": "pending",
+      "description": "**Goal:** Graph.open creates or opens the LadybugDB file under private/graph/, creates every table idempotently, holds a file lock while writable, and offers execute, rows, node, neighbors, tables, counts.\n\n**Files:**\n- Create: duet/schema.py\n- Create: duet/graph.py\n- Test: tests/test_graph.py\n\n**Acceptance Criteria:**\n- [ ] tables() contains 12 node and 14 relation tables after ensure_schema, idempotent\n- [ ] node() returns (table, props) without _ID/_LABEL; None when missing\n- [ ] neighbors(id, rel, direction) returns (rel, table, other_id, locator) tuples\n- [ ] second writer raises RuntimeError; read_only=True opens without lock\n- [ ] counts() covers every node table\n\n**Verify:** `.venv/bin/python -m unittest tests.test_graph -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/schema.py\", \"duet/graph.py\", \"tests/test_graph.py\"], \"verifyCommand\": \".venv/bin/python -m unittest tests.test_graph -v\", \"acceptanceCriteria\": [\"tables() contains 12 node and 14 relation tables after ensure_schema, idempotent\", \"node() returns (table, props) without _ID/_LABEL; None when missing\", \"neighbors(id, rel, direction) returns (rel, table, other_id, locator) tuples\", \"second writer raises RuntimeError; read_only=True opens without lock\", \"counts() covers every node table\"]}\n```",
+      "blockedBy": [
+        0
+      ]
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Changeset and gates",
+      "status": "pending",
+      "description": "**Goal:** Changeset is the only shape a writer can hand the graph, and run_gates rejects it with a named gate when any of the seven rules fails.\n\n**Files:**\n- Create: duet/changeset.py\n- Create: duet/gates.py\n- Test: tests/test_gates.py\n\n**Acceptance Criteria:**\n- [ ] Changeset JSON round trip and summary()\n- [ ] Named GateError for actor, integrity, evidence, status, commitment, scope\n- [ ] Valid changeset passes; existing statement Source in graph satisfies gate 2; CORRECTS edge satisfies gate 2\n\n**Verify:** `.venv/bin/python -m unittest tests.test_gates -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/changeset.py\", \"duet/gates.py\", \"tests/test_gates.py\"], \"verifyCommand\": \".venv/bin/python -m unittest tests.test_gates -v\", \"acceptanceCriteria\": [\"Changeset JSON round trip and summary()\", \"Named GateError for actor, integrity, evidence, status, commitment, scope\", \"Valid changeset passes; existing statement Source in graph satisfies gate 2; CORRECTS edge satisfies gate 2\"]}\n```",
+      "blockedBy": [
+        1
+      ]
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Gated write path with transactions, history and journal",
+      "status": "pending",
+      "description": "**Goal:** Graph.apply runs the gates, then retires, upserts and merges inside one transaction, records changed values in history, and journals the result; a rejection changes nothing.\n\n**Files:**\n- Modify: duet/graph.py\n- Test: tests/test_graph.py (ApplyTests)\n\n**Acceptance Criteria:**\n- [ ] Create sets created==updated, history [], scope tracked, owner karteek\n- [ ] Update bumps updated and appends old values to history; edges merge not duplicate\n- [ ] retire ids detach-deleted\n- [ ] Rejection leaves counts unchanged and journals result rejected with gate\n- [ ] indexer journals summary; other actors full changeset\n\n**Verify:** `.venv/bin/python -m unittest tests.test_graph -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/graph.py\", \"tests/test_graph.py\"], \"verifyCommand\": \".venv/bin/python -m unittest tests.test_graph -v\", \"acceptanceCriteria\": [\"Create sets created==updated, history [], scope tracked, owner karteek\", \"Update bumps updated and appends old values to history; edges merge not duplicate\", \"retire ids detach-deleted\", \"Rejection leaves counts unchanged and journals result rejected with gate\", \"indexer journals summary; other actors full changeset\"]}\n```",
+      "blockedBy": [
+        2
+      ]
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Vault page parser",
+      "status": "pending",
+      "description": "**Goal:** parse_page turns one Markdown page into frontmatter, title, resolved links, claim blocks and feedback callouts, standard library only.\n\n**Files:**\n- Create: duet/parse.py\n- Create: tests/fixtures/vault/{sources,identity,memory,wiki,private/accounts/acme}/*.md\n- Test: tests/test_parse.py\n\n**Acceptance Criteria:**\n- [ ] slugify and resolve_link behave as specified\n- [ ] Frontmatter parses, lists supported, absent frontmatter gives {}\n- [ ] Profile fixture yields two ClaimBlocks with evidence links resolved\n- [ ] Feedback fixture yields one callout with date, claim_target, scope, applied, text\n- [ ] Page.hash is sha256 of bytes\n\n**Verify:** `.venv/bin/python -m unittest tests.test_parse -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/parse.py\", \"tests/test_parse.py\", \"tests/fixtures/vault\"], \"verifyCommand\": \".venv/bin/python -m unittest tests.test_parse -v\", \"acceptanceCriteria\": [\"slugify and resolve_link behave as specified\", \"Frontmatter parses, lists supported, absent frontmatter gives {}\", \"Profile fixture yields two ClaimBlocks with evidence links resolved\", \"Feedback fixture yields one callout with date, claim_target, scope, applied, text\", \"Page.hash is sha256 of bytes\"]}\n```",
+      "blockedBy": [
+        0
+      ]
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Indexer (ECL) and duet index",
+      "status": "pending",
+      "description": "**Goal:** index() turns eligible pages into nodes and edges, applies one gated changeset per page, retires nodes of changed or deleted pages, skips unchanged pages by hash, saves a report.\n\n**Files:**\n- Create: duet/ecl.py\n- Modify: duet/__main__.py\n- Test: tests/test_ecl.py\n\n**Acceptance Criteria:**\n- [ ] Fixture yields 6 Documents, 1 Source, 2 Claims, 1 Feedback with CORRECTS, 1 Concept, 2 Persons, LINKS_TO and MENTIONS edges, private scope on Acme\n- [ ] Rejected page reported, others still index\n- [ ] Second run all unchanged; force re-applies\n- [ ] Edited heading retires Claim; deleted page retires its nodes\n- [ ] Excluded folders never indexed\n- [ ] CLI prints parsed=6 ... rejected=0\n\n**Verify:** `.venv/bin/python -m unittest tests.test_ecl -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/ecl.py\", \"duet/__main__.py\", \"tests/test_ecl.py\"], \"verifyCommand\": \".venv/bin/python -m unittest tests.test_ecl -v\", \"acceptanceCriteria\": [\"Fixture yields 6 Documents, 1 Source, 2 Claims, 1 Feedback with CORRECTS, 1 Concept, 2 Persons, LINKS_TO and MENTIONS edges, private scope on Acme\", \"Rejected page reported, others still index\", \"Second run all unchanged; force re-applies\", \"Edited heading retires Claim; deleted page retires its nodes\", \"Excluded folders never indexed\", \"CLI prints parsed=6 ... rejected=0\"]}\n```",
+      "blockedBy": [
+        3,
+        4
+      ]
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Projector and duet project",
+      "status": "pending",
+      "description": "**Goal:** project() writes six Markdown views under private/views/, every fact line linking its claim and its source.\n\n**Files:**\n- Create: duet/project.py\n- Modify: duet/__main__.py\n- Test: tests/test_project.py\n\n**Acceptance Criteria:**\n- [ ] me.md has Confirmed (1) and Hypotheses (1) with claim text, scope, source link, claim link\n- [ ] review-queue.md lists hypothesis and its feedback\n- [ ] stale.md lists only the overdue claim\n- [ ] commitments.md and decisions.md say None recorded yet.\n- [ ] index-report.md shows counts and rejected pages\n\n**Verify:** `.venv/bin/python -m unittest tests.test_project -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/project.py\", \"duet/__main__.py\", \"tests/test_project.py\"], \"verifyCommand\": \".venv/bin/python -m unittest tests.test_project -v\", \"acceptanceCriteria\": [\"me.md has Confirmed (1) and Hypotheses (1) with claim text, scope, source link, claim link\", \"review-queue.md lists hypothesis and its feedback\", \"stale.md lists only the overdue claim\", \"commitments.md and decisions.md say None recorded yet.\", \"index-report.md shows counts and rejected pages\"]}\n```",
+      "blockedBy": [
+        5
+      ]
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: Read-only MCP server, duet serve, vault registration",
+      "status": "pending",
+      "description": "**Goal:** python -m duet serve runs a stdio MCP server with six read tools and a Cypher guard refusing writing keywords, registered in the vault's .mcp.json.\n\n**Files:**\n- Create: duet/mcp_server.py\n- Modify: duet/__main__.py\n- Modify (vault): .mcp.json\n- Test: tests/test_mcp_server.py\n\n**Acceptance Criteria:**\n- [ ] list_tools names exactly get_entity, related, search, claims, query, duet_status\n- [ ] get_entity returns id, type, props, connections grouped by relation\n- [ ] related, search, claims, duet_status return expected shapes\n- [ ] query refuses SET/CREATE/MERGE/DELETE/DROP/COPY/INSTALL/LOAD/ALTER/BEGIN/COMMIT/ROLLBACK\n- [ ] vault .mcp.json has duet server; claude mcp list shows it\n\n**Verify:** `.venv/bin/python -m unittest tests.test_mcp_server -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/mcp_server.py\", \"duet/__main__.py\", \"tests/test_mcp_server.py\"], \"verifyCommand\": \".venv/bin/python -m unittest tests.test_mcp_server -v\", \"acceptanceCriteria\": [\"list_tools names exactly get_entity, related, search, claims, query, duet_status\", \"get_entity returns id, type, props, connections grouped by relation\", \"related, search, claims, duet_status return expected shapes\", \"query refuses SET/CREATE/MERGE/DELETE/DROP/COPY/INSTALL/LOAD/ALTER/BEGIN/COMMIT/ROLLBACK\", \"vault .mcp.json has duet server; claude mcp list shows it\"]}\n```",
+      "blockedBy": [
+        5
+      ]
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Rebuild, CLI tests, and acceptance on the real vault",
+      "status": "pending",
+      "description": "**Goal:** python -m duet rebuild deletes the database, re-indexes, replays applied non-indexer journal entries, re-renders views; CLI tests exist; the real vault indexes with zero rejections.\n\n**Files:**\n- Modify: duet/__main__.py\n- Test: tests/test_cli.py\n\n**Acceptance Criteria:**\n- [ ] rebuild reproduces fresh-index counts and keeps journal lines\n- [ ] mcp:claude applied journal entry is replayed\n- [ ] status prints counts: Claim=... Document=...\n- [ ] CLI tests drive index, project, status, rebuild via subprocess; index exits 1 on rejection\n- [ ] Real vault: rejected=0, me.md lists five confirmed claims with sources links, private/ ignored by vault Git\n- [ ] Manual: Claudian answers role question citing claim:identity/profile:professional-role and its source\n\n**Verify:** `.venv/bin/python -m unittest discover -s tests -v` \u2192 OK\n\n```json:metadata\n{\"files\": [\"duet/__main__.py\", \"tests/test_cli.py\"], \"verifyCommand\": \".venv/bin/python -m unittest discover -s tests -v\", \"acceptanceCriteria\": [\"rebuild reproduces fresh-index counts and keeps journal lines\", \"mcp:claude applied journal entry is replayed\", \"status prints counts: Claim=... Document=...\", \"CLI tests drive index, project, status, rebuild via subprocess; index exits 1 on rejection\", \"Real vault: rejected=0, me.md lists five confirmed claims with sources links, private/ ignored by vault Git\", \"Manual: Claudian answers role question citing claim:identity/profile:professional-role and its source\"]}\n```",
+      "blockedBy": [
+        6,
+        7
+      ]
+    }
+  ],
+  "lastUpdated": "2026-11-09T08:04:12+00:00"
+}
