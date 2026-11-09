@@ -29,8 +29,11 @@ def claim_rows(graph):
 
 def claim_line(c):
     sources = ' '.join(f'[{s}]({rel(s)})' for s in c['sources']) or 'no source'
-    page, _, anchor = c['locator'].partition('#')
-    claim_link = f'[{c["locator"]}]({rel(page)}#{anchor})' if anchor else f'[{c["locator"]}]({rel(page)})'
+    if c['locator']:
+        page, _, anchor = c['locator'].partition('#')
+        claim_link = f'[{c["locator"]}]({rel(page)}#{anchor})' if anchor else f'[{c["locator"]}]({rel(page)})'
+    else:  # a claim written through the MCP tools has no page of its own
+        claim_link = f'`{c["id"]}` (not on a page)'
     return (f'- **{c["label"]}** · status: {c["status"]} · scope: {c["scope_text"] or "unspecified"} · recorded {c["recorded"] or "unknown"}'
             f' · review by: {c["review_by"] or "not set"} · source: {sources} · claim: {claim_link}')
 

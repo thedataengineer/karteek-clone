@@ -22,7 +22,8 @@ class Graph:
         self._lock_file = lock_file
 
     @classmethod
-    def open(cls, p, read_only=False):
+    def open(cls, p, read_only=False, fresh=False):
+        """Open the graph. A writer holds the lock file; fresh=True deletes the database under that lock first."""
         p.graph_dir.mkdir(parents=True, exist_ok=True)
         lock_file = None
         if not read_only:
@@ -32,6 +33,10 @@ class Graph:
             except BlockingIOError:
                 lock_file.close()
                 raise RuntimeError('another duet process holds the graph')
+            if fresh:
+                for stale in [p.db, *p.graph_dir.glob(p.db.name + '.*')]:
+                    if stale.exists():
+                        stale.unlink()
         db = lb.Database(str(p.db), read_only=read_only)
         return cls(p, db, lb.Connection(db), lock_file)
 
@@ -87,7 +92,8 @@ class Graph:
         return {table: self.rows(f'MATCH (n:{table}) RETURN count(n)')[0][0] for table in NODE_TABLES}
 
     # the one write path
-    def apply(self, changeset, actor, now=None):
+    def apply(self, changeset, actor, now=None, result='applied'):
+        """Gate, write and journal one changeset. `result` is the journal label; rebuild passes 'replayed'."""
         when = now or now_iso()
         try:
             run_gates(changeset, self, actor)
@@ -111,7 +117,7 @@ class Graph:
         except Exception:
             self.execute('ROLLBACK')
             raise
-        self.journal('applied', actor, changeset, when)
+        self.journal(result, actor, changeset, when)
 
     def _upsert_node(self, node, when):
         props = dict(node.props)

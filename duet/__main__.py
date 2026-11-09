@@ -3,11 +3,13 @@ import argparse
 import json
 import sys
 
+from duet.changeset import Changeset, GateError
 from duet.config import paths
 from duet.ecl import index as run_index
 from duet.graph import Graph
 from duet.mcp_server import serve as run_serve
 from duet.project import project as run_project
+from duet.schema import NODE_TABLES
 
 
 def cmd_status(p, args):
@@ -19,6 +21,10 @@ def cmd_status(p, args):
               f'rejected={len(report.get("rejected", []))} skipped={len(report.get("skipped", []))}')
     else:
         print('last index: never')
+    if p.db.exists():
+        with Graph.open(p, read_only=True) as graph:
+            counts = graph.counts()
+        print('counts: ' + ' '.join(f'{table}={counts[table]}' for table in sorted(NODE_TABLES)))
     return 0
 
 
@@ -41,12 +47,40 @@ def cmd_project(p, args):
     return 0
 
 
+def cmd_rebuild(p, args):
+    replay = []
+    if p.journal.exists():
+        for line in p.journal.read_text().splitlines():
+            if not line.strip():
+                continue
+            entry = json.loads(line)
+            if entry.get('actor') != 'indexer' and entry.get('result') == 'applied' and 'nodes' in entry.get('changeset', {}):
+                replay.append(entry)
+    replayed = failed = 0
+    with Graph.open(p, fresh=True) as graph:  # the old database is deleted only once the writer lock is held
+        if p.index_state.exists():
+            p.index_state.unlink()
+        graph.ensure_schema()
+        report = run_index(p.vault, graph, force=True)
+        for entry in replay:
+            try:
+                # journaled as 'replayed', so the next rebuild replays the original entry only
+                graph.apply(Changeset.from_json(entry['changeset']), entry['actor'], now=entry.get('ts'), result='replayed')
+                replayed += 1
+            except GateError:
+                failed += 1
+        run_project(graph, p)
+    print(f'rebuilt: parsed={len(report["parsed"])} rejected={len(report["rejected"])} replayed={replayed} replay_failed={failed}')
+    return 1 if report['rejected'] or failed else 0
+
+
 def cmd_serve(p, args):
     run_serve(p)
     return 0
 
 
-COMMANDS = {'status': cmd_status, 'index': lambda p, args: cmd_index(p, args.force), 'project': cmd_project, 'serve': cmd_serve}
+COMMANDS = {'status': cmd_status, 'index': lambda p, args: cmd_index(p, args.force), 'project': cmd_project, 'serve': cmd_serve,
+            'rebuild': cmd_rebuild}
 
 
 def main(argv=None):
@@ -57,6 +91,7 @@ def main(argv=None):
     idx.add_argument('--force', action='store_true', help='Re-index every page regardless of hash.')
     sub.add_parser('project', help='Render Markdown views under private/views/.')
     sub.add_parser('serve', help='Run the read-only MCP server over stdio.')
+    sub.add_parser('rebuild', help='Delete the graph, re-index the vault, replay non-indexer journal entries, re-render views.')
     args = parser.parse_args(argv)
     return COMMANDS[args.command](paths(), args)
 
