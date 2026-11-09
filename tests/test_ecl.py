@@ -132,6 +132,14 @@ class IndexerTests(unittest.TestCase):
         index(self.vault, self.g)
         self.assertEqual([t[2] for t in self.g.neighbors('concept:other', 'ATTRIBUTED_TO', 'out')], ['person:jane-author'])
 
+    def test_broken_links_are_reported_on_every_run(self):
+        (self.vault / 'wiki' / 'dangling.md').write_text('# Dangling\n\nSee [gone](missing.md).\n')
+        expected = [{'path': 'wiki/dangling.md', 'line': 3, 'target': 'wiki/missing.md'}]
+        self.assertEqual(index(self.vault, self.g)['broken_links'], expected)
+        second = index(self.vault, self.g)
+        self.assertEqual(second['parsed'], [])
+        self.assertEqual(second['broken_links'], expected)
+
 
 if __name__ == '__main__':
     unittest.main()

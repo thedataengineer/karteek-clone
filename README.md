@@ -25,7 +25,7 @@ python3 scripts/check_in.py                # one check-in; writes under <vault>/
 python3 scripts/check_in.py --notify       # same, plus a fixed-text macOS notification
 python3 scripts/check_in.py --write-schedule --hour 9 --minute 0   # generate a launchd plist under <vault>/private/; not installed
 python3 scripts/catalog_workflows.py /path/outside/repo/catalog.html   # re-screen the workflow catalog into <vault>/workflows/library/
-.venv/bin/python -m unittest discover -s tests -v   # 64 offline tests, about 15 seconds, no network
+.venv/bin/python -m unittest discover -s tests -v   # 65 offline tests, about 15 seconds, no network
 ```
 
 The runner reads the prompt, manifest, and MCP configuration from the vault and runs Claude with the vault as its working directory, so the read tools see vault paths. Everything it writes goes under the vault's `private/` folder. Details of each script, its flags, and the tests are in [scripts/README.md](scripts/README.md).

@@ -181,6 +181,10 @@ def index(vault, graph, force=False):
     known_docs = set(by_path)
     known_claims = {claim_id(page.path, c.slug) for page in pages for c in claims_of(page)}
     skipped_paths = {item['path'] for item in report['skipped']}
+    for page in pages:  # every run lists every broken link, whether or not its page changed
+        for link in page.links:
+            if link.target and link.target not in known_docs:
+                report['broken_links'].append({'path': page.path, 'line': link.line, 'target': link.target})
 
     for rel in state:  # pages deleted since the last run
         if rel not in by_path and rel not in skipped_paths:
@@ -201,9 +205,6 @@ def index(vault, graph, force=False):
     # pass one: definitions, source pages first
     defined, rejected_paths = [], set()
     for page in sorted(changed, key=lambda pg: (0 if defines_source(pg) else 1, pg.path)):
-        for link in page.links:
-            if link.target and link.target not in known_docs:
-                report['broken_links'].append({'path': page.path, 'line': link.line, 'target': link.target})
         full = page_changeset(page, known_claims, known_docs)
         owned = [n.id for n in full.nodes if n.props.get('defined_in') == page.path]
         keep = set(owned) | {doc_id(page.path)}
