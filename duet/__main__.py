@@ -6,6 +6,7 @@ import sys
 from duet.config import paths
 from duet.ecl import index as run_index
 from duet.graph import Graph
+from duet.mcp_server import serve as run_serve
 from duet.project import project as run_project
 
 
@@ -40,7 +41,12 @@ def cmd_project(p, args):
     return 0
 
 
-COMMANDS = {'status': cmd_status, 'index': lambda p, args: cmd_index(p, args.force), 'project': cmd_project}
+def cmd_serve(p, args):
+    run_serve(p)
+    return 0
+
+
+COMMANDS = {'status': cmd_status, 'index': lambda p, args: cmd_index(p, args.force), 'project': cmd_project, 'serve': cmd_serve}
 
 
 def main(argv=None):
@@ -50,6 +56,7 @@ def main(argv=None):
     idx = sub.add_parser('index', help='Index changed vault pages into the graph.')
     idx.add_argument('--force', action='store_true', help='Re-index every page regardless of hash.')
     sub.add_parser('project', help='Render Markdown views under private/views/.')
+    sub.add_parser('serve', help='Run the read-only MCP server over stdio.')
     args = parser.parse_args(argv)
     return COMMANDS[args.command](paths(), args)
 
