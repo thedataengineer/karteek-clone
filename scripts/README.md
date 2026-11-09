@@ -1,6 +1,6 @@
 # Scripts and tests
 
-Two standalone Python scripts plus a small config module, standard library only, Python 3.9 or newer. Neither script installs anything or starts a service. Both locate the knowledge vault through `KARTEEK_VAULT` (environment variable, or `.env` in this repo) via `scripts/config.py`, read from it, and write only under its `private/` and `workflows/library/` folders.
+Two standalone Python scripts, standard library only, Python 3.9 or newer. Neither script installs anything or starts a service. Both locate the knowledge vault through `KARTEEK_VAULT` (environment variable, or `.env` in this repo) via `duet/config.py` (`scripts/config.py` is a shim that imports it), read from it, and write only under its `private/` and `workflows/library/` folders.
 
 ## check_in.py
 
@@ -36,15 +36,16 @@ It refuses to proceed when the card count does not match the page's own "workflo
 
 ## Tests
 
-Offline, standard-library `unittest`, a few seconds, no network and no Claude call. The workflow tests read the manifest, playbooks, and catalog from the configured vault, so `KARTEEK_VAULT` must be set.
+Offline, standard-library `unittest`, no network and no Claude call. The suite also holds the `duet` tests, so run it with the virtual environment. The workflow tests read the manifest, playbooks, and catalog from the configured vault, so `KARTEEK_VAULT` must be set.
 
 ```sh
-python3 -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
 | File | Covers |
 | --- | --- |
 | `tests/test_check_in.py` | Result validation accepts a good payload and rejects errors, missing evidence, duplicate keys and unsourced memories; duplicate suppression, dismissal surviving a new revision, snooze expiry; the schedule file is weekdays only, has no `RunAtLoad`, and carries `--notify` only when asked. |
 | `tests/test_workflows.py` | The vault's catalog, snapshot and manifest agree: every entry counted once, every playbook path exists, every manifest source is marked adopted in the catalog; a coding-titled entry is classed as engineering reference; the HTML parser treats embedded text as data. |
+| `tests/test_config.py`, `test_graph.py`, `test_gates.py`, `test_parse.py`, `test_ecl.py`, `test_project.py`, `test_mcp_server.py`, `test_cli.py` | The `duet` package against the fixture vault in `tests/fixtures/vault/`: paths, store and lock, each gate, the gated write path, the parser, the indexer, the views, the MCP tools and the command line. Described in the top-level README. |
 
 There is no end-to-end test of a live Claude run. That remains a manual step described in the vault's `integrations/README.md`.
