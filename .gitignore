@@ -8,3 +8,7 @@ __pycache__/
 .claude/settings.local.json
 .venv/
 *.egg-info/
+# the fixture vault needs its private page tracked; generated graph and views stay ignored
+!tests/fixtures/vault/private/
+tests/fixtures/vault/private/graph/
+tests/fixtures/vault/private/views/
