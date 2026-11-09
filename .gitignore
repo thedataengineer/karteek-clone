@@ -6,3 +6,5 @@
 private/
 __pycache__/
 .claude/settings.local.json
+.venv/
+*.egg-info/

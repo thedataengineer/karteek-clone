@@ -1,0 +1,13 @@
+[project]
+name = "duet"
+version = "0.1.0"
+description = "Karteek Duet: governed knowledge graph and proactive runner over the Karteek vault"
+requires-python = ">=3.12,<3.13"
+dependencies = ["ladybug==0.22.3", "mcp==2.3.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["duet"]
