@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 
 import ladybug as lb
 
+from duet.changeset import GateError
+from duet.gates import run_gates
 from duet.schema import NODE_TABLES, ddl
 
 
@@ -83,6 +85,62 @@ class Graph:
 
     def counts(self):
         return {table: self.rows(f'MATCH (n:{table}) RETURN count(n)')[0][0] for table in NODE_TABLES}
+
+    # the one write path
+    def apply(self, changeset, actor, now=None):
+        when = now or now_iso()
+        try:
+            run_gates(changeset, self, actor)
+        except GateError as err:
+            self.journal('rejected', actor, changeset, when, gate=err.gate, message=str(err))
+            raise
+        tables = {n.id: n.table for n in changeset.nodes}
+        self.execute('BEGIN TRANSACTION')
+        try:
+            for node_id in changeset.retire:
+                self.execute('MATCH (n {id: $id}) DETACH DELETE n', {'id': node_id})
+            for node in changeset.nodes:
+                self._upsert_node(node, when)
+            for edge in changeset.edges:
+                src_table = tables.get(edge.src) or self.node(edge.src)[0]
+                dst_table = tables.get(edge.dst) or self.node(edge.dst)[0]
+                self._upsert_edge(edge, src_table, dst_table, when)
+            self.execute('COMMIT')
+        except Exception:
+            self.execute('ROLLBACK')
+            raise
+        self.journal('applied', actor, changeset, when)
+
+    def _upsert_node(self, node, when):
+        props = dict(node.props)
+        props.setdefault('scope', 'tracked')
+        props.setdefault('owner', 'karteek')
+        props.pop('id', None)
+        for reserved in ('created', 'updated', 'history'):
+            props.pop(reserved, None)
+        existing = self.node(node.id)
+        if existing is None:
+            keys = ', '.join(f'{k}: ${k}' for k in props)
+            self.execute(f'CREATE (n:{node.table} {{id: $id, created: $now, updated: $now, history: [], {keys}}})',
+                         dict(props, id=node.id, now=when))
+            return
+        old = existing[1]
+        changed = {k: old.get(k) for k in props if old.get(k) != props[k]}
+        sets = ', '.join(f'n.{k} = ${k}' for k in props)
+        self.execute(f'MATCH (n:{node.table} {{id: $id}}) SET {sets}, n.updated = $now', dict(props, id=node.id, now=when))
+        if changed:
+            self.execute(f'MATCH (n:{node.table} {{id: $id}}) SET n.history = list_append(n.history, $h)',
+                         {'id': node.id, 'h': json.dumps(changed, sort_keys=True, default=str)})
+
+    def _upsert_edge(self, edge, src_table, dst_table, when):
+        self.execute(f'MATCH (a:{src_table} {{id: $a}}), (b:{dst_table} {{id: $b}}) '
+                     f'MERGE (a)-[r:{edge.rel}]->(b) SET r.locator = $locator, r.created = coalesce(r.created, $now)',
+                     {'a': edge.src, 'b': edge.dst, 'locator': edge.locator or '', 'now': when})
+
+    def journal_entries(self):
+        if not self.paths.journal.exists():
+            return []
+        return [json.loads(line) for line in self.paths.journal.read_text().splitlines() if line.strip()]
 
     # journal
     def journal(self, result, actor, changeset, when, gate=None, message=''):
