@@ -4,8 +4,8 @@ The code half of Karteek Clone. The other half is an Obsidian vault that holds e
 
 | Lives here | Lives in the vault |
 | --- | --- |
-| `duet/`, the governed knowledge graph: indexer, gates, views, read-only MCP server | `AGENTS.md`, `index.md`, `log.md`, `.mcp.json` |
-| `scripts/check_in.py`, the bounded proactive runner | `private/graph/` and `private/views/`, written by `duet` |
+| `duet/`, the governed knowledge graph: indexer, gates, views, MCP server, check-in runner | `AGENTS.md`, `index.md`, `log.md`, `.mcp.json` |
+| `duet/checkin.py`, the bounded proactive runner and its schedule | `private/graph/`, `private/views/` and `private/duet/`, written by `duet` |
 | `scripts/catalog_workflows.py`, the catalog importer | `identity/`, `memory/`, `sources/`, `templates/`, `evaluations/` |
 | `duet/config.py`, vault discovery (`scripts/config.py` is a shim) | `workflows/` with `manifest.json`, playbooks, `check-in-prompt.md`, `library/` |
 | `tests/`, offline unit tests with a fixture vault | `wiki/`, `books/`, `articles/`, `posts/` |
@@ -14,47 +14,50 @@ The code half of Karteek Clone. The other half is an Obsidian vault that holds e
 ## Setup
 
 1. Point the code at the vault. Copy `.env.example` to `.env` and set `KARTEEK_VAULT` to the vault directory. The environment variable of the same name overrides the file. The scripts refuse to run when the path has no `AGENTS.md`.
-2. Create the Python 3.12 environment and install the package: `/opt/homebrew/bin/python3.12 -m venv .venv && .venv/bin/pip install -e .`. LadybugDB has no wheel for Python 3.14. The two scripts under `scripts/` still run on the standard library alone.
-3. For a real check-in: Claude Code on `PATH`, signed in, with the vault's MCP providers authenticated through `/mcp` in an interactive session started inside the vault.
+2. Create the Python 3.12 environment and install the package: `/opt/homebrew/bin/python3.12 -m venv .venv && .venv/bin/pip install -e .`. LadybugDB has no wheel for Python 3.14. The catalog importer under `scripts/` still runs on the standard library alone.
+3. For a real check-in: Claude Code on `PATH` and signed in (`claude auth login`), with the vault's MCP providers authenticated through `/mcp` in an interactive session started inside the vault.
 
 ## Commands
 
 ```sh
-python3 scripts/check_in.py --dry-run      # print the Claude command; touch nothing
-python3 scripts/check_in.py                # one check-in; writes under <vault>/private/
-python3 scripts/check_in.py --notify       # same, plus a fixed-text macOS notification
-python3 scripts/check_in.py --write-schedule --hour 9 --minute 0   # generate a launchd plist under <vault>/private/; not installed
+.venv/bin/python -m duet checkin --dry-run   # print the Claude command; touch nothing
+.venv/bin/python -m duet checkin --notify    # one check-in: graph, daily note, and a fixed-text macOS notification
+.venv/bin/python -m duet schedule --hour 7 --minute 0 --notify --install   # weekday schedule, loaded with launchd
+.venv/bin/python -m duet schedule --remove   # unload the schedule
 python3 scripts/catalog_workflows.py /path/outside/repo/catalog.html   # re-screen the workflow catalog into <vault>/workflows/library/
-.venv/bin/python -m unittest discover -s tests -v   # 65 offline tests, about 15 seconds, no network
+.venv/bin/python -m unittest discover -s tests -v   # 94 offline tests, about 30 seconds, no network
 ```
 
-The runner reads the prompt, manifest, and MCP configuration from the vault and runs Claude with the vault as its working directory, so the read tools see vault paths. Everything it writes goes under the vault's `private/` folder. Details of each script, its flags, and the tests are in [scripts/README.md](scripts/README.md).
+The check-in reads the prompt, manifest, and MCP configuration from the vault and runs Claude with the vault as its working directory, so the read tools see vault paths. Claude only reads; the runner checks its result and writes it. Everything written goes under the vault's `private/` folder. The catalog importer and the tests are described in [scripts/README.md](scripts/README.md).
 
 ## Duet: the knowledge graph
 
-`duet` turns the vault's pages into a graph that only accepts sourced, well-formed knowledge, then gives it back as Markdown views and MCP read tools. The design is the vault's `docs/specs/2026-11-08-karteek-duet-design.md`; this is phase 1 of three.
+`duet` turns the vault's pages into a graph that only accepts sourced, well-formed knowledge, then gives it back as Markdown views and MCP tools, and runs the check-in that prepares work on a schedule. The design is the vault's `docs/specs/2026-11-08-karteek-duet-design.md`; phases 1 and 2 of three are built.
 
 ```sh
 .venv/bin/python -m duet index            # index changed pages, then refresh the views; exit 1 if any page is rejected
 .venv/bin/python -m duet index --force    # re-index every page
 .venv/bin/python -m duet project          # re-render the views only
 .venv/bin/python -m duet status           # vault, database, last run, node counts
-.venv/bin/python -m duet rebuild          # delete the graph, re-index, replay MCP-written entries from the journal
-.venv/bin/python -m duet serve            # read-only MCP server over stdio (the vault's .mcp.json starts it)
+.venv/bin/python -m duet rebuild          # delete the graph, re-index, replay check-in and MCP entries from the journal, re-read the daily notes
+.venv/bin/python -m duet serve            # MCP server over stdio: read tools and gated write tools (the vault's .mcp.json starts it)
+.venv/bin/python -m duet serve --read-only   # the read tools alone
 ```
 
 | Module | What it does |
 | --- | --- |
-| `duet/schema.py` | The model: 12 node tables, 14 relations, the allowed statuses and writers |
+| `duet/schema.py` | The model: 12 node tables, 14 relations, the allowed statuses and the three writers (`indexer`, `mcp:claude`, `runner`) |
 | `duet/changeset.py` | The only shape a writer can hand the graph: nodes to upsert, edges to merge, ids to retire, ids to unlink |
 | `duet/gates.py` | The rules a changeset must pass whole: known writer, valid endpoints, a source for every claim, a statement source or a correction for `confirmed`, a known or explicitly unknown commitment owner, no tracked-to-private links |
 | `duet/graph.py` | Owns the LadybugDB file, the writer lock, the one write path `apply`, and the journal |
 | `duet/parse.py` | Reads a page into frontmatter, links, claim blocks and feedback callouts |
 | `duet/ecl.py` | The indexer: definitions first (source pages before the claims that cite them), cross-page links second; skips unchanged pages by hash; retires what a page no longer defines |
-| `duet/project.py` | Writes `me.md`, `review-queue.md`, `stale.md`, `commitments.md`, `decisions.md`, `index-report.md` |
-| `duet/mcp_server.py` | Tools `get_entity`, `related`, `search`, `claims`, `query`, `duet_status`; opens the graph read-only per call, so answers follow the last index run |
+| `duet/project.py` | Writes `me.md`, `review-queue.md`, `stale.md`, `commitments.md`, `decisions.md`, `items.md`, `open-questions.md`, `index-report.md`, and a page per meeting and per account |
+| `duet/mcp_server.py` | Read tools `get_entity`, `related`, `search`, `claims`, `query`, `duet_status`, opened read-only per call so answers follow the last run. Write tools `record_source`, `propose_claim`, `record_decision`, `record_commitment`: private, assistant-owned, gated, and a claim is always a hypothesis |
+| `duet/checkin.py` | One check-in: index, run Claude with read tools only, validate the result, suppress what was already surfaced, apply one gated changeset as `runner`, append the daily note, notify. Also writes, installs and removes the launchd schedule |
+| `duet/daily.py` | The daily note `private/duet/YYYY-MM-DD.md`: renders item sections, and reads `status:` lines and drafts back into the graph on every index |
 
-What becomes what: a page under `sources/` with `type: personal-source` is a Source; a section with a `**Claim:**` field is a Claim, supported by the `sources/` pages its Evidence field links; a `> [!feedback]` callout is a Feedback that corrects the claim it links; a `type: knowledge` page is a Concept; every page is a Document with its links. Pages under `templates/` are Documents only. Everything `duet` writes is under the vault's `private/graph/` and `private/views/`, which the vault's Git ignores. The vault stays the source of truth: `rebuild` recreates the graph from the pages and the journal.
+What becomes what: a page under `sources/` with `type: personal-source` is a Source; a section with a `**Claim:**` field is a Claim, supported by the `sources/` pages its Evidence field links; a `> [!feedback]` callout is a Feedback that corrects the claim it links; a `type: knowledge` page is a Concept; every page is a Document with its links. Pages under `templates/` are Documents only. A check-in adds what no page holds: meetings, decisions, commitments, account context and open questions as private records that each cite the provider record, and Duet items that Karteek marks `done`, `dismissed` or `snoozed YYYY-MM-DD` in the daily note. Everything `duet` writes is under the vault's `private/graph/`, `private/views/` and `private/duet/`, which the vault's Git ignores. The vault stays the source of truth: `rebuild` recreates the graph from the pages, the journal and the daily notes.
 
 ## How the two halves relate
 

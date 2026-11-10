@@ -3,11 +3,13 @@
 A run has two passes. Pass one applies what each changed page defines (its Document, Source,
 Concept, Claim and Feedback nodes with the edges that make them valid), source pages first so a
 claim is never gated before the source it cites exists. Pass two merges the cross-page edges
-(LINKS_TO, MENTIONS, CORRECTS, SUPERSEDES) once every definition is in place.
+(LINKS_TO, MENTIONS, CORRECTS, SUPERSEDES) once every definition is in place. Daily notes under
+private/duet/ are not pages: `daily.read_back` reads their status lines and drafts at the end.
 """
 import json
 from pathlib import Path
 
+from duet import daily
 from duet.changeset import Changeset, Edge, GateError, Node
 from duet.graph import now_iso
 from duet.parse import parse_page, slugify
@@ -243,6 +245,7 @@ def index(vault, graph, force=False):
             new_state[page.path] = page.hash
 
     report['parsed'].sort()
+    report['notes'] = daily.read_back(graph, p)  # status and draft edits Karteek made in the daily notes
     report['finished'] = now_iso()
     p.graph_dir.mkdir(parents=True, exist_ok=True)
     p.index_state.write_text(json.dumps(new_state, indent=2, sort_keys=True) + '\n')

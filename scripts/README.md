@@ -1,28 +1,8 @@
 # Scripts and tests
 
-Two standalone Python scripts, standard library only, Python 3.9 or newer. Neither script installs anything or starts a service. Both locate the knowledge vault through `KARTEEK_VAULT` (environment variable, or `.env` in this repo) via `duet/config.py` (`scripts/config.py` is a shim that imports it), read from it, and write only under its `private/` and `workflows/library/` folders.
+One standalone Python script, standard library only, Python 3.9 or newer. It installs nothing and starts no service. It locates the knowledge vault through `KARTEEK_VAULT` (environment variable, or `.env` in this repo) via `duet/config.py` (`scripts/config.py` is a shim that imports it) and writes only under the vault's `workflows/library/` folder.
 
-## check_in.py
-
-One bounded proactive check-in. It asks Claude Code, in print mode with read-only tools, to look at the connected sources and return up to three prepared drafts plus source-attributed memories, then saves them under `private/`. Design and limits are described in the vault's `docs/architecture.md` (section on the check-in runner) and `workflows/runtime.md`.
-
-Prerequisites: `claude` on `PATH`, an interactive sign-in done beforehand, and the providers in the vault's `.mcp.json` authenticated through `/mcp` in an interactive session. The script does not bypass or perform authentication.
-
-| Invocation | Effect |
-| --- | --- |
-| `python3 scripts/check_in.py --dry-run` | Prints the exact Claude command and exits. Touches nothing. |
-| `python3 scripts/check_in.py` | One real check-in. Writes `briefings/`, `actions.json`, `memory.json` under the vault's `private/`. |
-| `python3 scripts/check_in.py --notify` | Same, plus a fixed-text macOS notification when at least one new item was saved. |
-| `python3 scripts/check_in.py --write-schedule --hour 9 --minute 0 [--notify]` | Writes `ai.karteek-clone.check-in.plist` under the vault's `private/` for weekdays at that local time, with `KARTEEK_VAULT` baked in. Does not install or load it. |
-
-A real run spends Claude usage, capped at $2 per run by the CLI budget flag, with a ten-minute process timeout. A failed or invalid run prints one line to stderr, exits 1, and leaves the ledger unchanged. Provider output is never echoed, so private context does not land in a terminal log.
-
-Things to know when editing it:
-
-- `READ_TOOLS` is the complete allowlist of MCP tools the unattended run may call. Names must match what each live server exposes; a wrong name silently denies that tool. Check `/mcp` in an interactive session before changing it. The list was verified against all three live servers on 2026-11-08.
-- `SCHEMA` and `parse_result` must stay in step. The schema is handed to Claude; `parse_result` re-checks the result because the ledger is only as trustworthy as that validation.
-- `select_new` is the whole duplicate-suppression policy. Dismissed and done win over everything; a future snooze wins over a new revision; an unchanged revision is quiet.
-- Writes go through `atomic_json` so a crash mid-run cannot leave a half-written ledger.
+The check-in runner that used to live here as `check_in.py` is now `duet/checkin.py`, run as `.venv/bin/python -m duet checkin`. It is described in the top-level README and in the vault's `workflows/runtime.md`.
 
 ## catalog_workflows.py
 
@@ -44,8 +24,10 @@ Offline, standard-library `unittest`, no network and no Claude call. The suite a
 
 | File | Covers |
 | --- | --- |
-| `tests/test_check_in.py` | Result validation accepts a good payload and rejects errors, missing evidence, duplicate keys and unsourced memories; duplicate suppression, dismissal surviving a new revision, snooze expiry; the schedule file is weekdays only, has no `RunAtLoad`, and carries `--notify` only when asked. |
+| `tests/test_checkin.py` | Result validation accepts a good payload and rejects errors, missing evidence, duplicate keys, unsourced memories and unresolved references; duplicate suppression, dismissal surviving a new revision, snooze expiry; a whole check-in against a stand-in Claude lands in the graph and the daily note; a gate refusal or a failed run writes nothing; a sign-in failure is named without echoing provider text; the schedule file is weekdays only, has no `RunAtLoad`, and its install steps are the expected launchctl calls. |
+| `tests/test_daily.py` | Draft headings are demoted; a note parses into keyed sections; status and draft edits reach the graph, a deleted section dismisses, a missing note changes nothing, an unreadable status is reported. |
+| `tests/test_mcp_write.py` | The four write tools: private and assistant-owned, a claim always a hypothesis with its source, gate refusals named and journaled, a confirmed claim not overwritable, a commitment owner only when given. |
 | `tests/test_workflows.py` | The vault's catalog, snapshot and manifest agree: every entry counted once, every playbook path exists, every manifest source is marked adopted in the catalog; a coding-titled entry is classed as engineering reference; the HTML parser treats embedded text as data. |
 | `tests/test_config.py`, `test_graph.py`, `test_gates.py`, `test_parse.py`, `test_ecl.py`, `test_project.py`, `test_mcp_server.py`, `test_cli.py` | The `duet` package against the fixture vault in `tests/fixtures/vault/`: paths, store and lock, each gate, the gated write path, the parser, the indexer, the views, the MCP tools and the command line. Described in the top-level README. |
 
-There is no end-to-end test of a live Claude run. That remains a manual step described in the vault's `integrations/README.md`.
+There is no end-to-end test of a live Claude run: `test_cli.py` runs `duet checkin` against a stand-in `claude` on `PATH`. A real run remains a manual step described in the vault's `integrations/README.md`.

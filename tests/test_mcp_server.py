@@ -38,7 +38,8 @@ class McpServerTests(unittest.TestCase):
 
     def test_tool_names(self):
         names = sorted(t.name for t in asyncio.run(self.server.list_tools()))
-        self.assertEqual(names, ['claims', 'duet_status', 'get_entity', 'query', 'related', 'search'])
+        self.assertEqual(names, ['claims', 'duet_status', 'get_entity', 'propose_claim', 'query', 'record_commitment',
+                                 'record_decision', 'record_source', 'related', 'search'])
 
     def test_get_entity_and_related(self):
         entity = call(self.server, 'get_entity', {'id': CLAIM})

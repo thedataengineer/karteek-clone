@@ -1,8 +1,10 @@
-"""Command line for Karteek Duet: index, project, serve, rebuild, status."""
+"""Command line for Karteek Duet: index, project, serve, checkin, schedule, rebuild, status."""
 import argparse
 import json
+import subprocess
 import sys
 
+from duet import checkin, daily
 from duet.changeset import Changeset, GateError
 from duet.config import paths
 from duet.ecl import index as run_index
@@ -69,18 +71,51 @@ def cmd_rebuild(p, args):
                 replayed += 1
             except GateError:
                 failed += 1
+        daily.read_back(graph, p)  # replayed items start as surfaced; the daily notes hold what Karteek did with them
         run_project(graph, p)
     print(f'rebuilt: parsed={len(report["parsed"])} rejected={len(report["rejected"])} replayed={replayed} replay_failed={failed}')
     return 1 if report['rejected'] or failed else 0
 
 
 def cmd_serve(p, args):
-    run_serve(p)
+    run_serve(p, read_only=args.read_only)
+    return 0
+
+
+def cmd_checkin(p, args):
+    if args.dry_run:
+        print(json.dumps(checkin.dry_run(p, args.notify), indent=2))
+        return 0
+    try:
+        return checkin.run(p, notify=args.notify)
+    except (ValueError, RuntimeError, OSError, subprocess.SubprocessError, GateError) as err:
+        print(f'Check-in stopped: {err}', file=sys.stderr)
+        return 1
+
+
+def cmd_schedule(p, args):
+    if args.remove:
+        print(f'Removed {checkin.remove_schedule()}; no check-in is scheduled.')
+        return 0
+    if not 0 <= args.hour <= 23 or not 0 <= args.minute <= 59:
+        print('Invalid local schedule time.', file=sys.stderr)
+        return 2
+    checkin.write_schedule(p, p.schedule_plist, args.hour, args.minute, args.notify)
+    when = f'weekdays at {args.hour:02d}:{args.minute:02d}, this Mac\'s local time'
+    if not args.install:
+        print(f'Generated {p.schedule_plist} for {when}; not installed. Add --install to load it.')
+        return 0
+    try:
+        target = checkin.install_schedule(p.schedule_plist)
+    except (RuntimeError, OSError) as err:
+        print(f'Schedule not installed: {err}', file=sys.stderr)
+        return 1
+    print(f'Installed {target}: a check-in runs {when}. Remove it with `python -m duet schedule --remove`.')
     return 0
 
 
 COMMANDS = {'status': cmd_status, 'index': lambda p, args: cmd_index(p, args.force), 'project': cmd_project, 'serve': cmd_serve,
-            'rebuild': cmd_rebuild}
+            'checkin': cmd_checkin, 'schedule': cmd_schedule, 'rebuild': cmd_rebuild}
 
 
 def main(argv=None):
@@ -90,7 +125,17 @@ def main(argv=None):
     idx = sub.add_parser('index', help='Index changed vault pages into the graph.')
     idx.add_argument('--force', action='store_true', help='Re-index every page regardless of hash.')
     sub.add_parser('project', help='Render Markdown views under private/views/.')
-    sub.add_parser('serve', help='Run the read-only MCP server over stdio.')
+    srv = sub.add_parser('serve', help='Run the MCP server over stdio: read tools and gated write tools.')
+    srv.add_argument('--read-only', action='store_true', help='Offer the read tools only.')
+    chk = sub.add_parser('checkin', help='Run one check-in: Claude prepares work, the result is gated into the graph and the daily note.')
+    chk.add_argument('--dry-run', action='store_true', help='Print the Claude command and exit; nothing runs or is written.')
+    chk.add_argument('--notify', action='store_true', help='Show a fixed-text macOS notification when something new was saved.')
+    sch = sub.add_parser('schedule', help='Write the weekday launchd schedule for check-ins, and optionally install or remove it.')
+    sch.add_argument('--hour', type=int, default=7)
+    sch.add_argument('--minute', type=int, default=0)
+    sch.add_argument('--notify', action='store_true', help='Scheduled check-ins notify when something new was saved.')
+    sch.add_argument('--install', action='store_true', help='Copy the schedule into ~/Library/LaunchAgents and load it.')
+    sch.add_argument('--remove', action='store_true', help='Unload the schedule and delete the installed file.')
     sub.add_parser('rebuild', help='Delete the graph, re-index the vault, replay non-indexer journal entries, re-render views.')
     args = parser.parse_args(argv)
     return COMMANDS[args.command](paths(), args)

@@ -57,6 +57,18 @@ class Paths:
     def views(self) -> Path:
         return self.vault / 'private' / 'views'
 
+    @property
+    def duet_dir(self) -> Path:
+        return self.vault / 'private' / 'duet'
+
+    @property
+    def checkin_lock(self) -> Path:
+        return self.vault / 'private' / 'check-in.lock'
+
+    @property
+    def schedule_plist(self) -> Path:
+        return self.vault / 'private' / 'ai.karteek-clone.check-in.plist'
+
 
 def paths(vault=None) -> Paths:
     return Paths(Path(vault).expanduser() if vault else vault_path())

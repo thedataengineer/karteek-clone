@@ -37,7 +37,7 @@ REL_PROPS = 'locator STRING, created STRING'
 
 STATUSES = ('confirmed', 'hypothesis', 'unknown', 'superseded')
 EVIDENCE_TABLES = ('Claim', 'Decision', 'Commitment', 'Meeting')
-ACTORS = ('indexer', 'mcp:claude')
+ACTORS = ('indexer', 'mcp:claude', 'runner')  # Karteek's edits, Claude through the MCP tools, the check-in runner
 SCOPES = ('tracked', 'private')
 
 
