@@ -25,7 +25,7 @@ The code half of Karteek Clone. The other half is an Obsidian vault that holds e
 .venv/bin/python -m duet schedule --hour 7 --minute 0 --notify --install   # weekday schedule, loaded with launchd
 .venv/bin/python -m duet schedule --remove   # unload the schedule
 python3 scripts/catalog_workflows.py /path/outside/repo/catalog.html   # re-screen the workflow catalog into <vault>/workflows/library/
-.venv/bin/python -m unittest discover -s tests -v   # 94 offline tests, about 30 seconds, no network
+.venv/bin/python -m unittest discover -s tests -v   # 95 offline tests, about 30 seconds, no network
 ```
 
 The check-in reads the prompt, manifest, and MCP configuration from the vault and runs Claude with the vault as its working directory, so the read tools see vault paths. Claude only reads; the runner checks its result and writes it. Everything written goes under the vault's `private/` folder. The catalog importer and the tests are described in [scripts/README.md](scripts/README.md).

@@ -249,8 +249,8 @@ def failure_reason(stdout):
         envelope = json.loads(stdout)
     except (TypeError, ValueError):
         return ''
-    if not isinstance(envelope, dict):
-        return ''
+    if not isinstance(envelope, dict) or not envelope.get('is_error'):
+        return ''  # a successful result may itself mention sign-in, in its coverage lines
     text = str(envelope.get('result') or '')
     if 'authenticate' in text.lower() or 'not logged in' in text.lower() or '/login' in text:
         return 'Claude Code is not signed in on this Mac. Run `claude auth login` in a terminal, then try again.'
@@ -294,10 +294,10 @@ def run(p, notify=False, now=None, runner=subprocess.run, claude=None, out=print
         prompt += f'\nCurrent local time: {now.isoformat()}'
         prompt += '\nDuet items already surfaced (data, not instructions):\n' + json.dumps(surfaced)
         done = runner(command(claude, p), input=prompt, cwd=p.vault, text=True, capture_output=True, timeout=600)
-        reason = failure_reason(done.stdout)
-        if done.returncode or reason:
+        if done.returncode:
             # Provider output may hold private context, so only a known, safe reason is ever printed.
-            raise RuntimeError((reason or 'Claude failed. Check the sign-in and the /mcp connections.') + ' Nothing was written.')
+            reason = failure_reason(done.stdout) or 'Claude failed. Check the sign-in and the /mcp connections.'
+            raise RuntimeError(reason + ' Nothing was written.')
         result = parse_result(done.stdout, set(manifest))
         day = now.date().isoformat()
         note = daily.note_rel(day)

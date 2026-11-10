@@ -231,6 +231,11 @@ class RunTests(unittest.TestCase):
         self.assertNotIn('Acme', str(ctx.exception))
         self.assertFalse((self.vault / 'private/duet').exists())
 
+    def test_a_successful_run_that_reports_a_provider_sign_in_gap_is_kept(self):
+        code, _ = self.run_once(envelope(items=[item()], coverage=['Plaud: failed to authenticate, run /login', 'Calendar read']))
+        self.assertEqual(code, 0)
+        self.assertIn('- Plaud: failed to authenticate, run /login', (self.vault / 'private/duet/2026-11-10.md').read_text())
+
     def test_a_gate_rejection_writes_no_note_and_is_journaled(self):
         original = checkin.result_changeset
 
